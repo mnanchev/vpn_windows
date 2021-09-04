@@ -1,0 +1,138 @@
+! Amazon Web Services
+! Virtual Private Cloud
+
+! To configure this VPN connection using the New Connection Security Rule Wizard
+! in the Windows Server 2012 R2 console, use the information below and refer to
+! the AWS VPC Network Administrator Guide for more information:
+! http://docs.aws.amazon.com/AmazonVPC/latest/NetworkAdminGuide/customer-gateway-windows-2012.html
+
+! Your VPN Connection ID 		    : vpn-02e3b9a632470124c
+! Your Virtual Private Gateway ID           : vgw-05dc3c872a1305fb7
+! Your Customer Gateway ID		    : cgw-03af6614ae145488d
+
+! Information needed for the configuration of your VPN connection:
+
+! vgw-05dc3c872a1305fb7 Tunnel1
+! --------------------------------------------------------------------------------
+! Local Tunnel Endpoint:         54.225.36.174
+! Remote Tunnel Endpoint:        34.197.9.11
+! Endpoint 1:                    [Your_Static_Route_IP_Prefix]
+! Endpoint 2:                    [Your_VPC_CIDR_Block]
+! Preshared key:                 g6U8CoqtCo.A.IQqMUNMqeYPqlWbx8k7
+
+! vgw-05dc3c872a1305fb7 Tunnel2
+! --------------------------------------------------------------------------------
+! Local Tunnel Endpoint:         54.225.36.174
+! Remote Tunnel Endpoint:        54.235.62.184
+! Endpoint 1:                    [Your_Static_Route_IP_Prefix]
+! Endpoint 2:                    [Your_VPC_CIDR_Block]
+! Preshared key:                 tKHW1bLDq7k1FGdP12iOjjmBHVdWvnGD
+
+! Local Tunnel Endpoint:
+! The IP address you entered for your customer gateway when you created
+! the VPN connection for your Amazon VPC.
+!
+! * You should use the private IP address of the Windows Server 2012 R2 
+! server rather than this IP address when you enter the Local Tunnel Endpoint
+! in the New Connection Security Rule Wizard or in the netsh script below.
+
+! Remote Tunnel Endpoint
+! One of two IP addresses for the Amazon virtual private gateway that 
+! terminates the VPN connection on the AWS side of the connection.
+
+! Endpoint 1
+! The IP prefix that you entered as a static route when you created your
+! VPN connection. This indicates the IP addresses in your network that are 
+! allowed to use the VPN connection to access your Amazon VPC.
+
+! Endpoint 2
+! The IP address range (CIDR block) of your Amazon VPC; for example, 10.0.0.0/16
+
+! Preshared key
+! This is the pre-shared key that is used to establish IPsec VPN connection
+! between the Local Tunnel Endpoint and the Remote Tunnel Endpoint.
+
+! Note
+! From time to time, AWS will perform routine maintenance on the virtual private 
+! gateway. This maintenance may disable one of the two tunnels of your VPN 
+! connection for a brief period of time. Your VPN connection will automatically
+! fail over to the second tunnel while this maintenance is performed. To ensure 
+! uninterrupted service, it's important that you configure both tunnels.
+
+! Configuration Details for IKE and IPsec
+! =======================================
+! Additional information regarding the Internet Key Exchange (IKE) and IPsec 
+! Security Associations (SA) are presented below. Because the AWS VPC VPN
+! suggested settings are the same as the Windows Server 2012 R2 default IPsec
+! configuration settings, minimal work is needed on your part (see QuickModePFS
+! below.)
+
+! MainModeSecMethods:        DHGroup2-AES128-SHA1
+! MainModeKeyLifetime:       480min,0sess
+! QuickModeSecMethods:       ESP:SHA1-AES128+60min+100000kb
+! QuickModePFS:              DHGroup2
+
+! MainModeSecMethods
+! This specifies the encryption and authentication algorithms for the IKE SA.
+! These are the suggested settings for the AWS VPC VPN connection and are the
+! default settings for Windows Server 2012 R2 IPsec VPN connections.
+
+! MainModeKeyLifetime
+! This specifies the IKE SA key lifetime.  This is the suggested setting for
+! the AWS VPC VPN connection and is the default setting for Windows Server 
+! 2012 R2 IPsec VPN connections.
+
+! QuickModeSecMethods
+! This specifies the encryption and authentication algorithms for the IPsec SA.
+! These are the suggested settings for the AWS VPC VPN connection and are the
+! default settings for Windows Server 2012 R2 IPsec VPN connections.
+
+! QuickModePFS
+! The use of master key perfect forward secrecy (PFS) is suggested for your
+! IPsec sessions. Enabling PFS isn't possible via the Windows Server 2012 R2
+! user interface. The only way to enable this setting is to execute the netsh
+! script (below) with QMPFS=dhgroup2
+
+! Dead Gateway Detection
+! --------------------------------------------------------------------------------
+! To configure TCP to detect when a gateway becomes unavailable, run the following
+! command to enable Dead Gateway Detection:
+reg add HKLM\System\CurrentControlSet\services\Tcpip\Parameters ^
+/v EnableDeadGWDetect /t REG_DWORD /d 1
+
+! After you change the registry key, you must reboot the server. 
+
+! Netsh script to configure your IPsec VPN connection
+! --------------------------------------------------------------------------------
+! You can automatically configure your IPsec VPN connection by copying and pasting
+! the netsh scripts below. Replace the items in brackets [] with the appropriate
+! values as indicated above.
+
+! Script for Tunnel 1:
+netsh advfirewall consec add rule Name="vgw-05dc3c872a1305fb7 Tunnel 1" `
+Enable=Yes Profile=any Type=Static Mode=Tunnel `
+LocalTunnelEndpoint=192.168.0.23 `
+RemoteTunnelEndpoint=34.197.9.11 Endpoint1="192.168.0.0/16" `
+Endpoint2="10.10.0.0/16" Protocol=Any Action=RequireInClearOut `
+Auth1=ComputerPSK Auth1PSK=g6U8CoqtCo.A.IQqMUNMqeYPqlWbx8k7 `
+QMSecMethods=ESP:SHA1-AES128+60min+100000kb `
+ExemptIPsecProtectedConnections=No ApplyAuthz=No QMPFS=dhgroup2
+
+! Script for Tunnel 2:
+netsh advfirewall consec add rule Name="vgw-05dc3c872a1305fb7 Tunnel 2" `
+Enable=Yes Profile=any Type=Static Mode=Tunnel `
+LocalTunnelEndpoint=192.168.0.23 `
+RemoteTunnelEndpoint=54.235.62.184 Endpoint1="192.168.0.0/16" `
+Endpoint2="10.10.0.0/16" Protocol=Any Action=RequireInClearOut `
+Auth1=ComputerPSK Auth1PSK=tKHW1bLDq7k1FGdP12iOjjmBHVdWvnGD `
+QMSecMethods=ESP:SHA1-AES128+60min+100000kb `
+ExemptIPsecProtectedConnections=No ApplyAuthz=No QMPFS=dhgroup2
+
+
+! Additional Notes and Questions
+!  - Amazon Virtual Private Cloud Getting Started Guide: 
+!       http://docs.aws.amazon.com/AmazonVPC/latest/GettingStartedGuide
+!  - Amazon Virtual Private Cloud Network Administrator Guide: 
+!       http://docs.aws.amazon.com/AmazonVPC/latest/NetworkAdminGuide
+!  - XSL Version: 2009-07-15-1119716
+      
